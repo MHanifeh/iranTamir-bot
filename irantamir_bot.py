@@ -1,24 +1,4 @@
-# =========================
 # file: irantamir_bot.py
-# =========================
-"""
-Run locally:
-  python -m venv .venv && . .venv/bin/activate
-  pip install -r requirements.txt
-  export BOT_TOKEN='7564697686:AAG1xCd22_P0T_MLLjusQGtQr0kmgsVH_jE'
-  export DATABASE_URL='postgresql://postgres:mmBjOLJYVoiygolcPpgbfDJUynAkUAUI@shuttle.proxy.rlwy.net:32895/railway'
-  export ADMIN_TELEGRAM_ID='698037613'
-  python irantamir_bot.py
-
-On Railway:
-  - Set Variables (recommended):
-    BOT_TOKEN
-    DATABASE_URL   (can reference your Postgres service variable)
-    ADMIN_TELEGRAM_ID
-    # optional for webhook:
-    WEBHOOK_URL=https://<your-railway-app>.up.railway.app/webhook
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -48,7 +28,7 @@ from telegram.ext import (
 
 # Optional Word import
 try:
-    from docx import Document as Docx
+    from docx import Document as Docx  # type: ignore
 except Exception:
     Docx = None  # type: ignore
 
@@ -71,7 +51,7 @@ if not RAW_BOT_TOKEN:
     raise SystemExit("Missing BOT_TOKEN")
 
 def to_asyncpg_url(url: str) -> str:
-    # Why: SQLAlchemy async Postgres requires the async driver.
+    # Required by SQLAlchemy async driver for Postgres
     return url.replace("postgresql://", "postgresql+asyncpg://", 1) if url.startswith("postgresql://") else url
 
 DB_URL = to_asyncpg_url(RAW_DB_URL)
@@ -88,14 +68,18 @@ class Item(Base):
     quantity: Mapped[int] = mapped_column(Integer, default=0)
     unit: Mapped[str] = mapped_column(String(32), default="عدد")
     meta: Mapped[dict] = mapped_column(JSON, default={})
-    # Epoch seconds (SQLite vs Postgres)
+    # Use epoch seconds; compatible across SQLite/Postgres
     created_at: Mapped[int] = mapped_column(
         BigInteger,
-        server_default=text("(strftime('%s','now'))" if DB_URL.startswith("sqlite") else "extract(epoch from now())"),
+        server_default=text(
+            "(strftime('%s','now'))" if DB_URL.startswith("sqlite") else "extract(epoch from now())"
+        ),
     )
     updated_at: Mapped[int] = mapped_column(
         BigInteger,
-        server_default=text("(strftime('%s','now'))" if DB_URL.startswith("sqlite") else "extract(epoch from now())"),
+        server_default=text(
+            "(strftime('%s','now'))" if DB_URL.startswith("sqlite") else "extract(epoch from now())"
+        ),
     )
 
 engine = create_async_engine(DB_URL, echo=False, pool_pre_ping=True, future=True)
@@ -496,7 +480,7 @@ async def wake_word(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     set_wake(update.effective_chat.id)
     await update.effective_message.reply_text("بله؟")
 
-# ---------- NL handler (with admin gate on mutating intents) ----------
+# ---------- NL handler ----------
 async def nlu_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
     if not msg or (msg.from_user and msg.from_user.is_bot):
@@ -630,35 +614,3 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         pass
-
-
-# =========================
-# file: requirements.txt
-# =========================
-python-telegram-bot>=21,<22
-SQLAlchemy>=2.0,<3
-asyncpg>=0.29
-aiosqlite>=0.20
-pandas>=2.0
-openpyxl>=3.1
-python-docx>=1.1
-uvloop>=0.19; sys_platform != "win32"
-
-# =========================
-# file: Dockerfile
-# =========================
-FROM python:3.11-slim
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY irantamir_bot.py .
-ENV PORT=8080
-CMD ["python", "irantamir_bot.py"]
-
-# =========================
-# file: README.md
-# =========================
-# Inventory Bot (FA) – Telegram
-## Local
