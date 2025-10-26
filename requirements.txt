@@ -1,0 +1,8 @@
+python-telegram-bot>=21,<22
+SQLAlchemy>=2.0,<3
+asyncpg>=0.29
+aiosqlite>=0.20
+pandas>=2.0
+openpyxl>=3.1
+python-docx>=1.1
+uvloop>=0.19; sys_platform != "win32"
